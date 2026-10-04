@@ -1,0 +1,10 @@
+# Store LF in the repository regardless of the OS that checks it out, so diffs
+# stay clean and CI behaves the same as a local run. Without this, Git on
+# Windows converts to CRLF and every file shows up as fully modified for
+# contributors on macOS or Linux.
+* text=auto eol=lf
+
+# Never rewrite line endings inside these
+*.png binary
+*.jpg binary
+*.ico binary

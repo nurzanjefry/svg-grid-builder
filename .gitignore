@@ -1,0 +1,23 @@
+# Dependencies — this project has none, but just in case
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Scratch files used while checking layout in a real browser
+_chromeprofile*/
+_dom.*

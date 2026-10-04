@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid → SVG Builder</title>
+<style>
+  :root{
+    --bg:#0f1218;
+    --panel:#161b24;
+    --panel-2:#1d2530;
+    --line:#2a3442;
+    --text:#e6ebf2;
+    --muted:#8d9aab;
+    --accent:#4c8dff;
+    --accent-2:#7ee0c0;
+    --radius:10px;
+    --zoom:24px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font:14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select{font:inherit;color:inherit}
+
+  header{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 16px;border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.2px}
+  header .dot{width:8px;height:8px;border-radius:50%;background:var(--accent-2)}
+  header .spacer{flex:1}
+  header .hint{color:var(--muted);font-size:12px}
+
+  .app{
+    display:grid;
+    grid-template-columns:250px minmax(0,1fr) 380px;
+    height:calc(100% - 47px);
+  }
+  @media (max-width:1150px){
+    .app{grid-template-columns:230px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;height:auto}
+    .out{grid-column:1 / -1;border-left:none;border-top:1px solid var(--line)}
+  }
+  @media (max-width:720px){
+    .app{grid-template-columns:1fr}
+    .side{border-right:none;border-bottom:1px solid var(--line)}
+  }
+
+  .side{
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    padding:14px;
+    overflow:auto;
+  }
+  .stage{
+    display:flex;flex-direction:column;min-width:0;min-height:0;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #182030 0%, transparent 70%),
+      var(--bg);
+  }
+
+  .grp{margin-bottom:16px}
+  .grp h2{
+    font-size:11px;text-transform:uppercase;letter-spacing:.9px;
+    color:var(--muted);margin:0 0 8px;font-weight:600;
+  }
+  .row{display:flex;gap:8px;align-items:center}
+  .row + .row{margin-top:8px}
+  .row label{color:var(--muted);font-size:12px;flex:1}
+
+  input[type=number]{
+    width:62px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:7px;padding:5px 7px;
+  }
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  input[type=color]{
+    width:100%;height:34px;padding:0;border:1px solid var(--line);
+    border-radius:7px;background:var(--panel-2);cursor:pointer;
+  }
+
+  .btn{
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:7px;padding:6px 10px;cursor:pointer;
+    transition:background .12s,border-color .12s,transform .06s;
+    white-space:nowrap;
+  }
+  .btn:hover{background:#243040;border-color:#38465a}
+  .btn:active{transform:translateY(1px)}
+  .btn.wide{flex:1;text-align:center}
+  .btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:#3d7de6}
+
+  .palette{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+  .sw{
+    aspect-ratio:1;border-radius:6px;border:2px solid transparent;
+    cursor:pointer;padding:0;outline:1px solid rgba(255,255,255,.08);
+  }
+  .sw.on{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+
+  .canvas-area{
+    flex:1;min-height:0;overflow:auto;padding:22px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .grid{
+    display:grid;
+    gap:1px;
+    /* Centred on both axes. margin:auto does the actual work rather than the
+       parent's align/justify alone: auto margins absorb the free space while
+       the grid fits, but resolve to 0 once it outgrows the pane. That way a
+       large grid overflows toward the scrollable edge instead of being pushed
+       off the top-left, where no scrollbar could reach it. */
+    margin:auto;
+    background:#33404f;
+    border:1px solid #33404f;
+    border-radius:4px;
+    box-shadow:0 18px 50px rgba(0,0,0,.45);
+    touch-action:none;
+    user-select:none;
+    cursor:crosshair;
+  }
+  .grid.nolines{gap:0;background:transparent;border-color:transparent}
+  .cell{
+    width:var(--zoom);height:var(--zoom);
+    background-color:#ffffff;
+    background-image:
+      linear-gradient(45deg,#e9edf2 25%,transparent 25%,transparent 75%,#e9edf2 75%),
+      linear-gradient(45deg,#e9edf2 25%,transparent 25%,transparent 75%,#e9edf2 75%);
+    background-size:8px 8px;
+    background-position:0 0,4px 4px;
+  }
+
+  .statusbar{
+    display:flex;gap:14px;align-items:center;
+    padding:8px 16px;border-top:1px solid var(--line);
+    background:var(--panel);color:var(--muted);font-size:12px;
+  }
+
+  .out{
+    background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;min-width:0;min-height:0;
+  }
+  .out-preview{
+    padding:16px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    min-height:170px;
+    background-image:
+      linear-gradient(45deg,#222a35 25%,transparent 25%,transparent 75%,#222a35 75%),
+      linear-gradient(45deg,#222a35 25%,transparent 25%,transparent 75%,#222a35 75%);
+    background-size:16px 16px;
+    background-position:0 0,8px 8px;
+  }
+  .out-preview svg{
+    width:auto;height:auto;max-width:100%;max-height:180px;
+    image-rendering:pixelated;
+    filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));
+  }
+  .out-code{flex:1;min-height:0;display:flex;flex-direction:column}
+  .out-code .bar{
+    display:flex;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);
+  }
+  pre{
+    flex:1;margin:0;overflow:auto;padding:12px;
+    font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color:#cfe0f5;white-space:pre;tab-size:2;
+  }
+  .empty-msg{color:var(--muted);font-size:12px;padding:0 12px 12px}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot"></span>
+  <h1>Grid → SVG Builder</h1>
+  <span class="spacer"></span>
+  <span class="hint">drag to paint &nbsp;·&nbsp; right-click erases &nbsp;·&nbsp; <b>P</b> paint &nbsp;·&nbsp; <b>E</b> erase &nbsp;·&nbsp; <b>C</b> clear &nbsp;·&nbsp; Ctrl+Z undo</span>
+</header>
+
+<div class="app">
+
+  <!-- ── controls ─────────────────────────────────────────── -->
+  <aside class="side">
+    <div class="grp">
+      <h2>Grid</h2>
+      <div class="row"><label for="cols">Columns</label><input id="cols" type="number" min="1" max="128" value="16"></div>
+      <div class="row"><label for="rows">Rows</label><input id="rows" type="number" min="1" max="128" value="16"></div>
+      <div class="row"><label for="preset">Preset</label>
+        <select id="preset" class="btn" style="flex:0 0 auto">
+          <option value="">—</option>
+          <option value="8x8">8 × 8</option>
+          <option value="16x16">16 × 16</option>
+          <option value="24x24">24 × 24</option>
+          <option value="32x32">32 × 32</option>
+          <option value="48x32">48 × 32</option>
+          <option value="64x64">64 × 64</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h2>View</h2>
+      <div class="row"><label for="zoom">Cell size</label><span id="zoomVal" style="color:var(--muted);font-size:12px">24px</span></div>
+      <input id="zoom" type="range" min="6" max="48" value="24">
+      <div class="row"><label for="lines">Grid lines</label><input id="lines" type="checkbox" checked></div>
+    </div>
+
+    <div class="grp">
+      <h2>Colour</h2>
+      <div class="palette" id="palette"></div>
+      <div class="row" style="margin-top:8px"><input id="color" type="color" value="#111827"></div>
+    </div>
+
+    <div class="grp">
+      <h2>Tool</h2>
+      <div class="row">
+        <button class="btn wide on" id="toolPaint" title="Paint (P)">Paint</button>
+        <button class="btn wide" id="toolErase" title="Erase (E)">Erase</button>
+      </div>
+      <div class="row">
+        <button class="btn wide" id="fillAll" title="Fill every cell with the current colour">Fill all</button>
+        <button class="btn wide" id="clearAll" title="Clear the grid (C) — undoable with Ctrl+Z">Clear</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h2>Transform</h2>
+      <div class="row">
+        <button class="btn wide" id="flipH" title="Flip horizontally">↔ Flip</button>
+        <button class="btn wide" id="flipV" title="Flip vertically">↕ Flip</button>
+      </div>
+      <div class="row">
+        <button class="btn wide" id="rot">⟳ Rotate 90°</button>
+      </div>
+      <div class="row">
+        <button class="btn wide" id="undo">↶ Undo</button>
+        <button class="btn wide" id="redo">↷ Redo</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── editor ───────────────────────────────────────────── -->
+  <main class="stage">
+    <div class="canvas-area" id="canvasArea">
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="statusbar">
+      <span id="statGrid">16 × 16</span>
+      <span id="statCells">0 cells filled</span>
+      <span id="statColors">0 colours</span>
+      <span id="statRects">0 rects</span>
+    </div>
+  </main>
+
+  <!-- ── output ───────────────────────────────────────────── -->
+  <section class="out">
+    <div class="out-preview" id="preview"></div>
+    <div class="out-code">
+      <div class="bar">
+        <button class="btn primary wide" id="copyBtn">Copy SVG</button>
+        <button class="btn wide" id="dlBtn">Download .svg</button>
+      </div>
+      <div class="bar">
+        <button class="btn wide" id="saveJsonBtn">Save .json</button>
+        <button class="btn wide" id="loadJsonBtn">Load .json</button>
+        <input type="file" id="loadJsonFile" accept="application/json,.json" hidden>
+      </div>
+      <pre id="code"></pre>
+      <div class="empty-msg" id="emptyMsg">Click some cells to start building.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const PALETTE = [
+    '#111827', '#374151', '#6b7280', '#9ca3af', '#e5e7eb', '#ffffff',
+    '#ef4444', '#f97316', '#f59e0b', '#facc15', '#84cc16', '#22c55e',
+    '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899',
+  ];
+
+  const S = {
+    cols: 16,
+    rows: 16,
+    zoom: 24,
+    lines: true,
+    cells: [],          // string colour, or '' for empty
+    color: '#111827',
+    tool: 'paint',
+  };
+
+  const $ = id => document.getElementById(id);
+  const gridEl   = $('grid');
+  const previewEl= $('preview');
+  const codeEl   = $('code');
+  const emptyMsg = $('emptyMsg');
+
+  let cellEls = [];
+  let needsUpdate = false;
+
+  /* ── history ─────────────────────────────────────────── */
+  const history = { stack: [], index: -1, limit: 120 };
+
+  function snapshot() {
+    return { cols: S.cols, rows: S.rows, cells: S.cells.slice() };
+  }
+  function pushHistory() {
+    const snap = snapshot();
+    const last = history.stack[history.index];
+    if (last && last.cols === snap.cols && last.rows === snap.rows &&
+        last.cells.join('\u0000') === snap.cells.join('\u0000')) return false;
+    history.stack.length = history.index + 1;
+    history.stack.push(snap);
+    if (history.stack.length > history.limit) history.stack.shift();
+    history.index = history.stack.length - 1;
+    return true;
+  }
+  function restore(snap) {
+    S.cols = snap.cols;
+    S.rows = snap.rows;
+    S.cells = snap.cells.slice();
+    syncSizeInputs();
+    buildGrid();
+    schedule();
+  }
+  function undo() { if (history.index > 0) restore(history.stack[--history.index]); }
+  function redo() { if (history.index < history.stack.length - 1) restore(history.stack[++history.index]); }
+
+  /* ── grid construction ───────────────────────────────── */
+  function buildGrid() {
+    gridEl.style.gridTemplateColumns = `repeat(${S.cols}, ${S.zoom}px)`;
+    gridEl.classList.toggle('nolines', !S.lines);
+    document.documentElement.style.setProperty('--zoom', S.zoom + 'px');
+
+    const frag = document.createDocumentFragment();
+    cellEls = new Array(S.cols * S.rows);
+    for (let i = 0; i < cellEls.length; i++) {
+      const d = document.createElement('div');
+      d.className = 'cell';
+      d.dataset.i = i;
+      frag.appendChild(d);
+      cellEls[i] = d;
+    }
+    gridEl.replaceChildren(frag);
+    for (let i = 0; i < cellEls.length; i++) paintCellEl(i);
+  }
+
+  function paintCellEl(i) {
+    const el = cellEls[i];
+    if (!el) return;
+    const c = S.cells[i];
+    if (c) {
+      el.style.backgroundColor = c;
+      el.style.backgroundImage = 'none';
+    } else {
+      el.style.backgroundColor = '';
+      el.style.backgroundImage = '';
+    }
+  }
+
+  function resizeGrid(cols, rows) {
+    cols = Math.max(1, Math.min(128, cols | 0));
+    rows = Math.max(1, Math.min(128, rows | 0));
+    if (cols === S.cols && rows === S.rows) return;
+
+    const next = new Array(cols * rows).fill('');
+    const copyC = Math.min(cols, S.cols);
+    const copyR = Math.min(rows, S.rows);
+    for (let r = 0; r < copyR; r++) {
+      for (let c = 0; c < copyC; c++) next[r * cols + c] = S.cells[r * S.cols + c] || '';
+    }
+    S.cols = cols; S.rows = rows; S.cells = next;
+    buildGrid();
+    schedule();
+  }
+
+  function syncSizeInputs() {
+    $('cols').value = S.cols;
+    $('rows').value = S.rows;
+  }
+
+  /* ── painting ────────────────────────────────────────── */
+  let stroke = null;
+
+  function indexFromEvent(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const cell = el && el.closest ? el.closest('.cell') : null;
+    if (!cell || !gridEl.contains(cell)) return -1;
+    const i = Number(cell.dataset.i);
+    return Number.isInteger(i) && i >= 0 && i < S.cells.length ? i : -1;
+  }
+
+  function applyTo(i) {
+    const want = stroke.action === 'paint' ? stroke.color : '';
+    if (S.cells[i] === want) return;
+    S.cells[i] = want;
+    paintCellEl(i);
+    schedule();
+  }
+
+  gridEl.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.button !== 2) return;
+    const i = indexFromEvent(e);
+    if (i < 0) return;
+    e.preventDefault();
+    try { gridEl.setPointerCapture(e.pointerId); } catch (_) {}
+
+    pushHistory();
+    let action;
+    if (e.button === 2 || S.tool === 'erase') action = 'erase';
+    else action = S.cells[i] === S.color ? 'erase' : 'paint';   // click same colour toggles off
+    stroke = { action, color: S.color };
+    applyTo(i);
+  });
+
+  gridEl.addEventListener('pointermove', e => {
+    if (!stroke) return;
+    const i = indexFromEvent(e);
+    if (i >= 0) applyTo(i);
+  });
+
+  const endStroke = e => {
+    if (!stroke) return;
+    stroke = null;
+    try { gridEl.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  gridEl.addEventListener('pointerup', endStroke);
+  gridEl.addEventListener('pointercancel', endStroke);
+  gridEl.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ── transforms ──────────────────────────────────────── */
+  function transform(fn, newCols, newRows) {
+    pushHistory();
+    const next = new Array(newCols * newRows).fill('');
+    for (let r = 0; r < S.rows; r++) {
+      for (let c = 0; c < S.cols; c++) {
+        const v = S.cells[r * S.cols + c];
+        if (!v) continue;
+        const [nr, nc] = fn(r, c);
+        next[nr * newCols + nc] = v;
+      }
+    }
+    S.cols = newCols; S.rows = newRows; S.cells = next;
+    syncSizeInputs();
+    buildGrid();
+    schedule();
+  }
+
+  /* ── SVG output ──────────────────────────────────────────
+     Merge filled cells into as few rectangles as possible before writing
+     them out. Two passes: merge each row into horizontal runs, then stack
+     vertically-adjacent runs that share the same x and width. A solid 8x8
+     block therefore emits 1 <rect> instead of 64, which keeps big grids
+     small and makes the output far easier to hand-edit later.
+
+     Approach adapted from Gridsmith's gridToSvg() — Gridsmith,
+     Copyright (c) 2026 Martial Systems LLC, MIT licensed.
+     See the NOTICE file for the full attribution. */
+  function mergedRects() {
+    const w = S.cols, h = S.rows;
+    const byColor = new Map();
+
+    // pass 1 — horizontal runs
+    for (let y = 0; y < h; y++) {
+      let x = 0;
+      while (x < w) {
+        const c = S.cells[y * w + x];
+        if (!c) { x++; continue; }
+        let run = 1;
+        while (x + run < w && S.cells[y * w + x + run] === c) run++;
+        let list = byColor.get(c);
+        if (!list) byColor.set(c, list = []);
+        list.push({ x, y, w: run, h: 1 });
+        x += run;
+      }
+    }
+
+    // pass 2 — stack runs that sit directly on top of an identical run
+    for (const rects of byColor.values()) {
+      rects.sort((a, b) => a.x - b.x || a.y - b.y);
+      const merged = [];
+      for (const r of rects) {
+        const prev = merged[merged.length - 1];
+        if (prev && prev.x === r.x && prev.w === r.w && prev.y + prev.h === r.y) {
+          prev.h += r.h;
+        } else {
+          merged.push({ ...r });
+        }
+      }
+      rects.length = 0;
+      rects.push(...merged);
+    }
+    return byColor;
+  }
+
+  function buildSVG() {
+    const w = S.cols, h = S.rows;
+    const groups = mergedRects();
+    const parts = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">`,
+      `  <title>grid-${w}x${h}</title>`,
+      `  <desc>Pixel grid ${w}x${h}. One rect per merged run of same-coloured cells; empty cells are transparent.</desc>`,
+    ];
+    for (const [color, rects] of groups) {
+      parts.push(`  <g fill="${color}">`);
+      for (const r of rects) {
+        parts.push(`    <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`);
+      }
+      parts.push('  </g>');
+    }
+    parts.push('</svg>');
+    return parts.join('\n');
+  }
+
+  function updateOutput() {
+    needsUpdate = false;
+    const svg = buildSVG();
+    previewEl.innerHTML = svg;
+    codeEl.textContent = svg;
+
+    let filled = 0;
+    for (const c of S.cells) if (c) filled++;
+
+    const groups = mergedRects();
+    let rects = 0;
+    for (const list of groups.values()) rects += list.length;
+
+    $('statGrid').textContent = `${S.cols} × ${S.rows}`;
+    $('statCells').textContent = `${filled} cell${filled === 1 ? '' : 's'} filled`;
+    $('statColors').textContent = `${groups.size} colour${groups.size === 1 ? '' : 's'}`;
+    $('statRects').textContent = `${rects} rect${rects === 1 ? '' : 's'}`;
+    emptyMsg.style.display = filled ? 'none' : '';
+  }
+
+  function schedule() {
+    queueSave();
+    if (needsUpdate) return;
+    needsUpdate = true;
+    requestAnimationFrame(updateOutput);
+  }
+
+  /* ── save / load ─────────────────────────────────────────
+     A grid file is plain JSON: {width, height, pixels, format}. pixels is a
+     row-major array of "#rrggbb" (or null for empty), so the format stays
+     readable and diffable. The same document is mirrored into localStorage
+     on a debounce, so a refresh or an accidental tab close doesn't lose work. */
+  const LS_KEY = 'svg-grid-builder/v1';
+  const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let saveTimer = null;
+
+  function gridToJSON() {
+    return JSON.stringify({
+      width: S.cols,
+      height: S.rows,
+      pixels: S.cells.map(c => c || null),
+      format: 'click-grid-v1',
+    }, null, 2);
+  }
+
+  function queueSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(LS_KEY, gridToJSON()); } catch (_) {}
+    }, 400);
+  }
+
+  function applyGrid(cols, rows, pixels) {
+    S.cols = cols; S.rows = rows; S.cells = pixels;
+    syncSizeInputs();
+    buildGrid();
+    schedule();
+  }
+
+  function loadJSON(raw) {
+    const d = JSON.parse(raw);
+    const w = Number(d.width), h = Number(d.height);
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 128 || h > 128) {
+      throw new Error('width and height must be whole numbers from 1 to 128');
+    }
+    if (!Array.isArray(d.pixels) || d.pixels.length !== w * h) {
+      throw new Error(`pixels must be an array of ${w * h} entries`);
+    }
+    const pixels = d.pixels.map(p => {
+      if (p === null || p === undefined || p === '') return '';
+      if (typeof p !== 'string' || !HEX_RE.test(p.trim())) {
+        throw new Error(`not a hex colour: ${JSON.stringify(p)}`);
+      }
+      return p.trim().toLowerCase();
+    });
+    applyGrid(w, h, pixels);
+  }
+
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) { loadJSON(raw); return true; }
+    } catch (_) {}
+    return false;
+  }
+
+  /* ── controls wiring ─────────────────────────────────── */
+  const paletteEl = $('palette');
+  PALETTE.forEach(hex => {
+    const b = document.createElement('button');
+    b.className = 'sw';
+    b.style.background = hex;
+    b.dataset.hex = hex;
+    b.title = hex;
+    b.addEventListener('click', () => setColor(hex));
+    paletteEl.appendChild(b);
+  });
+
+  function setColor(hex) {
+    S.color = hex;
+    $('color').value = hex;
+    S.tool = 'paint';
+    syncToolButtons();
+    [...paletteEl.children].forEach(b => b.classList.toggle('on', b.dataset.hex === hex));
+  }
+
+  function syncToolButtons() {
+    $('toolPaint').classList.toggle('on', S.tool === 'paint');
+    $('toolErase').classList.toggle('on', S.tool === 'erase');
+  }
+
+  $('color').addEventListener('input', e => setColor(e.target.value));
+  $('toolPaint').addEventListener('click', () => { S.tool = 'paint'; syncToolButtons(); });
+  $('toolErase').addEventListener('click', () => { S.tool = 'erase'; syncToolButtons(); });
+
+  $('cols').addEventListener('change', e => { pushHistory(); resizeGrid(+e.target.value, S.rows); });
+  $('rows').addEventListener('change', e => { pushHistory(); resizeGrid(S.cols, +e.target.value); });
+
+  $('preset').addEventListener('change', e => {
+    if (!e.target.value) return;
+    const [c, r] = e.target.value.split('x').map(Number);
+    pushHistory();
+    resizeGrid(c, r);
+    e.target.value = '';
+  });
+
+  $('zoom').addEventListener('input', e => {
+    S.zoom = +e.target.value;
+    $('zoomVal').textContent = S.zoom + 'px';
+    buildGrid();
+  });
+
+  $('lines').addEventListener('change', e => {
+    S.lines = e.target.checked;
+    gridEl.classList.toggle('nolines', !S.lines);
+  });
+
+  function clearGrid() {
+    pushHistory();                                   // so Ctrl+Z brings it back
+    S.cells = new Array(S.cols * S.rows).fill('');
+    buildGrid();
+    schedule();
+  }
+
+  $('clearAll').addEventListener('click', clearGrid);
+
+  $('fillAll').addEventListener('click', () => {
+    pushHistory();
+    S.cells = new Array(S.cols * S.rows).fill(S.color);
+    buildGrid();
+    schedule();
+  });
+
+  $('flipH').addEventListener('click', () => transform((r, c) => [r, S.cols - 1 - c], S.cols, S.rows));
+  $('flipV').addEventListener('click', () => transform((r, c) => [S.rows - 1 - r, c], S.cols, S.rows));
+  $('rot').addEventListener('click',  () => transform((r, c) => [c, S.rows - 1 - r], S.rows, S.cols));
+  $('undo').addEventListener('click', undo);
+  $('redo').addEventListener('click', redo);
+
+  $('copyBtn').addEventListener('click', async () => {
+    const svg = buildSVG();
+    const btn = $('copyBtn');
+    try {
+      await navigator.clipboard.writeText(svg);
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = svg;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    const old = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  });
+
+  $('dlBtn').addEventListener('click', () => {
+    const blob = new Blob([buildSVG()], { type: 'image/svg+xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `grid-${S.cols}x${S.rows}.svg`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  $('saveJsonBtn').addEventListener('click', () => {
+    const blob = new Blob([gridToJSON()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `grid-${S.cols}x${S.rows}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+
+  $('loadJsonBtn').addEventListener('click', () => $('loadJsonFile').click());
+
+  $('loadJsonFile').addEventListener('change', async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';                       // allow re-picking the same file
+    if (!file) return;
+    try {
+      pushHistory();
+      loadJSON(await file.text());
+    } catch (err) {
+      alert(`Could not load that grid file.\n\n${err.message}`);
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+
+    if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+
+    // Bail out on browser/OS chords (Ctrl+C copy, Cmd+E, Alt+...) *before*
+    // the single-letter shortcuts below, or Ctrl+C would clear the grid.
+    // Also ignore keystrokes aimed at a form field.
+    if (mod || e.altKey) return;
+    if (e.target instanceof Element && e.target.matches('input,select,textarea')) return;
+
+    switch (k) {
+      case 'p':
+      case 'b':                       // keep B as a legacy alias for paint
+        S.tool = 'paint'; syncToolButtons(); break;
+      case 'e':
+        S.tool = 'erase'; syncToolButtons(); break;
+      case 'c':
+        clearGrid(); break;
+    }
+  });
+
+  /* ── boot ────────────────────────────────────────────── */
+  S.cells = new Array(S.cols * S.rows).fill('');
+  setColor(S.color);
+  loadLocal();              // restores the previous session, if there is one
+  syncSizeInputs();
+  buildGrid();
+  pushHistory();
+  updateOutput();
+})();
+</script>
+</body>
+</html>

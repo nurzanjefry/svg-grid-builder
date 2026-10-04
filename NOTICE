@@ -1,0 +1,104 @@
+svg-grid-builder
+Copyright (c) 2026 nurzan
+Licensed under the MIT License (see LICENSE).
+
+================================================================================
+THIRD-PARTY NOTICES
+================================================================================
+
+This project contains code adapted from the software named below. The original
+copyright notice and permission notice are reproduced here, as required by the
+terms of that license.
+
+--------------------------------------------------------------------------------
+Gridsmith
+--------------------------------------------------------------------------------
+
+    Gridsmith
+    Copyright (c) 2026 Martial Systems LLC
+
+    Licensed under the MIT License. The full licence terms, as they apply to
+    Gridsmith, are reproduced below.
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to permit
+    persons to whom the Software is furnished to do so, subject to the
+    following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+
+    Gridsmith is a retro pixel-art to SVG editor and a dependency-free
+    JavaScript library (engine.js) for quantizing images onto a pixel grid and
+    exporting SVG. It is produced by Martial Systems LLC / Martial Games.
+
+    WHAT WAS USED HERE
+    ------------------
+    The two-pass rectangle merging strategy in the mergedRects() function of
+    index.html is adapted from Gridsmith's gridToSvg() (engine.js):
+
+      Pass 1 collapses each row of filled cells into horizontal runs of a
+      single colour.
+      Pass 2 stacks vertically-adjacent runs that share the same x origin and
+      width into taller rectangles.
+
+    The purpose is to keep exported SVGs small: a solid 32x32 block is 1024
+    cells but becomes a single <rect> rather than 1024 of them.
+
+    This project is an independent implementation and is not affiliated with,
+    endorsed by, or sponsored by Martial Systems LLC or Martial Games. It is
+    not the official Gridsmith, and the official hosted product and API are
+    separate works by their authors.
+
+    The adaptation is also noted in a source comment at the top of
+    mergedRects() in index.html.
+
+--------------------------------------------------------------------------------
+Prior art (no code used)
+--------------------------------------------------------------------------------
+
+The following projects were surveyed while designing svg-grid-builder. No code
+was taken from them. They are listed because they shaped the design decisions
+behind this tool, and because their authors deserve the credit for exploring
+this space first.
+
+    svg-pixel-editor, by TheRealSmeddy
+    MIT License.
+    A lightweight browser-based pixel art editor that exports SVG. The closest
+    existing tool to this one.
+
+    pixel-forge, by BataJini
+    MIT License.
+    A far more ambitious fully client-side pixel-art editor with layers,
+    animation frames, palettes, and PNG/SVG/GIF/spritesheet export.
+
+    Widget-Pixel-Art-Editor, by XerVth
+    ISC License.
+    A similar pixel-art-to-SVG editor, packaged as an Electron desktop
+    application rather than a single web page.
+
+--------------------------------------------------------------------------------
+Deliberately not used
+--------------------------------------------------------------------------------
+
+Two widely referenced projects in this space publish no license file at all:
+
+    SvgPixelArt, by jerosoler
+
+    logo-designer, by JuliusBrussee
+
+Public visibility is not the same as a grant of rights. Absent a license, the
+default is that all rights are reserved and the code is not legally reusable.
+No code from either project appears in svg-grid-builder. They are noted here so
+that anyone building in this area checks for a license before copying.
